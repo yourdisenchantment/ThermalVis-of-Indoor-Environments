@@ -1,0 +1,19 @@
+[project]
+name = "thermalvis-of-indoor-environments"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "yourdisenchantment",email = "p.idisenchantment@gmail.com"}
+]
+readme = "README.md"
+requires-python = ">=3.13,<4.0"
+
+packages = [{ include = "thermalvis_of_indoor_environments", from = "src" }]
+
+include = []
+
+dependencies = ["poetry-core (>=2.0.0)"]
+
+[build-system]
+requires = ["poetry-core>=2.0.0"]
+build-backend = "poetry.core.masonry.api"
