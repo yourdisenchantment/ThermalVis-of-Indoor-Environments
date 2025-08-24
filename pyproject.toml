@@ -1,19 +1,45 @@
 [project]
 name = "thermalvis-of-indoor-environments"
-version = "0.1.0"
-description = ""
-authors = [
-    {name = "yourdisenchantment",email = "p.idisenchantment@gmail.com"}
-]
+version = "0.2.0"
+description = "Visualization of indoor thermal environment"
+authors = [{ name = "yourdisenchantment", email = "p.idisenchantment@gmail.com" }]
 readme = "README.md"
-requires-python = ">=3.13,<4.0"
+requires-python = ">=3.11,<4.0"
+license = "MIT"
 
+dependencies = [
+  "numpy>=2.1",
+  "scipy>=1.14",
+  "matplotlib>=3.9",
+]
+
+[project.scripts]
+thermalvis = "thermalvis_of_indoor_environments.cli:main"
+
+# Poetry-специфическая часть для src-layout:
+[tool.poetry]
 packages = [{ include = "thermalvis_of_indoor_environments", from = "src" }]
 
-include = []
-
-dependencies = ["poetry-core (>=2.0.0)"]
+[tool.poetry.group.dev.dependencies]
+mypy = "^1.17.1"
+ruff = "^0.12.10"
+scipy-stubs = "^1.16.1.1"
+pyinstaller = { version = "^6.15", python = ">=3.8,<3.15" }
+poetry-core = "^2.0.0"
 
 [build-system]
 requires = ["poetry-core>=2.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["F", "E", "W", "I", "B", "C4", "UP", "SIM"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
