@@ -1,6 +1,7 @@
 # ThermalVis of Indoor Environments
 
-Визуализация 3D‑распределения температуры внутри помещения по температурам четырёх стен. Поддерживаются два набора значений (например, “день” и “вечер”) с:
+Визуализация 3D‑распределения температуры внутри помещения по температурам четырёх стен. Поддерживаются два набора
+значений (например, "день" и "вечер") с:
 - общим цветовым диапазоном (удобно сравнивать),
 - регулируемой прозрачностью поверхностей,
 - гарантированным вертикальным зазором между поверхностями (anti-slip),
@@ -12,9 +13,9 @@
 
 ## Требования
 
-- Python 3.11–3.12 (рекомендовано; на 3.13 SciPy/Matplotlib могут не иметь готовых колёс).
+- Python 3.11–3.13.
 - Poetry 2.x.
-- Графическое окружение для окна Matplotlib. На сервере/CI используйте headless-режим (см. ниже).
+- Графическое окружение для окна Matplotlib.
 
 Проверка окружения:
 ```bash
@@ -24,16 +25,12 @@ poetry --version
 
 ---
 
-## Установка (из исходников)
+## Установка
 
 ```bash
-git clone <url-вашего-репозитория>
-cd thermalvis-of-indoor-environments
-
-# Рекомендуемый Python
-poetry env use 3.12
-
-# Установка зависимостей
+git clone --recursive --depth=1 https://github.com/yourdisenchantment/ThermalVis-of-Indoor-Environments.git
+cd ThermalVis-of-Indoor-Environments
+poetry env use 3.13
 poetry install
 ```
 
@@ -41,199 +38,161 @@ poetry install
 
 ## Быстрый старт
 
-Запуск из проекта (через Poetry):
-- Интерактивно (попросит ввести температуры):
+Запуск из проекта (через Poetry)
+
+- Интерактивно:
   ```bash
   poetry run thermalvis
+  # Сначала спросит: сколько графиков (1/2),
+  # затем точки в порядке: т.1 запад, т.2 север, т.3 юг, т.4 восток,
+  # затем (опционально) шаг делений и прозрачность.
   ```
-- Один набор значений:
+
+- Один набор (CLI):
   ```bash
-  poetry run thermalvis -n 20.5 -w 20.8 -s 21.1 -e 20.3
+  poetry run thermalvis -t 1 -n 20.5 -w 20.8 -s 21.1 -e 20.3
   ```
-- Два набора (например, “вечер” выше на 0.3):
+
+- Два набора (CLI): используйте разделитель наборов «\» как отдельный аргумент.
+    - Bash/zsh (Linux/macOS): передавайте его как литерал в кавычках '\'
   ```bash
-  poetry run thermalvis \
+  poetry run thermalvis -t 2 \
     -n 20.1 -w 20.9 -s 20.5 -e 20.7 \
-    -N 20.4 -W 21.2 -S 20.8 -E 21.0 \
-    --min-gap 0.05 --alpha 0.4
+    '\' \
+    -n 20.4 -w 21.2 -s 20.8 -e 21.0 \
+    --min-gap 0.1 --alpha 0.4
   ```
-- Сохранить без показа окна (headless):
+    - PowerShell (Windows): перенос строк - обратная кавычка `, разделитель - просто \
+  ```powershell
+  poetry run thermalvis -t 2 `
+    -n 20.1 -w 20.9 -s 20.5 -e 20.7 `
+    \ `
+    -n 20.4 -w 21.2 -s 20.8 -e 21.0 `
+    --min-gap 0.1 --alpha 0.4
+  ```
+
+Подсказки
+
+- --tick-step <шаг> управляет делениями по оси Z и на цветовой шкале (например, 0.05 для более частых делений).
+- --min-gap - вертикальный зазор между поверхностями (anti-slip), а не шаг делений.
+- Headless экспорт:
   - Linux/macOS:
     ```bash
-    MPLBACKEND=Agg poetry run thermalvis \
-      -n 20.1 -w 20.9 -s 20.5 -e 20.7 \
-      -N 20.4 -W 21.2 -S 20.8 -E 21.0 \
-      --no-show --save plot.png
+    MPLBACKEND=Agg poetry run thermalvis -t 1 -n 20.5 -w 20.8 -s 21.1 -e 20.3 --no-show --save plot.png
     ```
-  - Windows (PowerShell):
+  - Windows PowerShell:
     ```powershell
     $env:MPLBACKEND="Agg"
-    poetry run thermalvis -n 20.1 -w 20.9 -s 20.5 -e 20.7 -N 20.4 -W 21.2 -S 20.8 -E 21.0 --no-show --save plot.png
+    poetry run thermalvis -t 1 -n 20.5 -w 20.8 -s 21.1 -e 20.3 --no-show --save plot.png
     ```
-
-Альтернатива: запуск как модуля
-```bash
-poetry run python -m thermalvis_of_indoor_environments -n 20.5 -w 20.8 -s 21.1 -e 20.3
-```
 
 ---
 
 ## CLI справка
 
-Посмотреть помощь:
 ```bash
-thermalvis --help
-# или во время разработки:
 poetry run thermalvis --help
 ```
 
-Доступные опции:
-- Набор 1 (обязательный):
-  - -n, --north  — северная стена
-  - -w, --west   — западная стена
-  - -s, --south  — южная стена
-  - -e, --east   — восточная стена
-- Набор 2 (опционально):
-  - -N, --north2
-  - -W, --west2
-  - -S, --south2
-  - -E, --east2
+Основные опции:
+
+- -t, --type {1,2} - количество графиков (1 или 2).
+- Наборы значений:
+    - Для каждого набора: -n/--north, -w/--west, -s/--south, -e/--east.
+    - Между наборами поставьте отдельным аргументом символ «\».
 - Визуализация:
-  - --min-gap <float>   — минимальный вертикальный зазор между поверхностями (например, 0.05 или 0.1)
-  - --alpha <float>     — прозрачность поверхностей (0..1), по умолчанию 0.4
-  - --no-show           — не открывать окно (полезно в CI/сервере)
-  - --save <path>       — сохранить изображение (PNG/PDF/SVG)
-
-Примечания:
-- Если для набора 2 указан хоть один из -N/-W/-S/-E, недостающие значения будут запрошены интерактивно.
-- Единицы — градусы (°C), дробные значения через точку: 20.5.
+    - --min-gap <float>    - минимальный вертикальный зазор между поверхностями (напр., 0.05 или 0.1).
+    - --alpha <float>      - прозрачность поверхностей (0..1), по умолчанию 0.4.
+    - --tick-step <float>  - шаг делений по оси Z и на colorbar (напр., 0.1 или 0.05).
+    - --no-show - не открывать окно (полезно в CI/сервере).
+    - --save <path>        - сохранить изображение (PNG/PDF/SVG).
 
 ---
 
-## Как это работает
+## Примеры
 
-- Вход: температуры в серединах четырёх стен. Угловые точки вычисляются как средние между соседними стенами.
-- Интерполяция: регулярная сетка 25×25; метод cubic с фоллбеком на linear.
-- Область: значения вне заданного контура помещения маскируются (NaN не рисуются).
-- Два набора: обе поверхности нормализуются одной цветовой шкалой (общий vmin/vmax), чтобы сравнение было честным.
-- Anti‑slip: если поверхности слишком близко, они симметрично разводятся по Z до зазора min_gap.
-- Ось Z и “стены” помещения: диапазон берётся по общим значениям, расширяется до int(min)−1 и int(max)+1.
+Ниже примеры для bash/zsh (Linux/macOS) с разделителем наборов как литерал '\'.
 
----
-
-## Структура проекта
-
-```
-thermalvis-of-indoor-environments/
-├─ pyproject.toml
-├─ README.md
-├─ src/
-│  └─ thermalvis_of_indoor_environments/
-│     ├─ __init__.py
-│     ├─ __main__.py
-│     ├─ app.py        # логика визуализации (поддержка 1–2 наборов)
-│     └─ cli.py        # CLI: парсинг аргументов, сохранение, headless и т.п.
-└─ tests/              # опционально (pytest)
-```
-
-CLI команда thermalvis определяется в pyproject.toml (project.scripts).
-
----
-
-## Сборка и запуск установленного приложения
-
-Собрать пакет:
+Temp 1
 ```bash
-poetry build
-# dist/*.whl и *.tar.gz
+poetry run thermalvis -t 2 \
+  -n 20.1 -w 20.0 -s 20.4 -e 18.8 \
+  '\' \
+  -n 20.2 -w 20.0 -s 20.5 -e 20.0 \
+  --min-gap 0.05 --alpha 0.4
 ```
 
-Установить и запустить (варианты):
-- В отдельное venv:
-  ```bash
-  python -m venv .venv-run && . .venv-run/bin/activate  # Windows: .venv-run\Scripts\activate
-  pip install dist/thermalvis_of_indoor_environments-*.whl
-  thermalvis --help
-  ```
-- Через pipx (рекомендуется для CLI):
-  ```bash
-  pipx install dist/thermalvis_of_indoor_environments-*.whl
-  thermalvis --help
-  ```
+Phi 1
 
----
-
-## Сборка бинарника (exe) через PyInstaller
-
-Добавить dev-зависимость (с ограничением по Python):
 ```bash
-poetry add --group dev 'pyinstaller@^6.15; python_version < "3.15"'
+poetry run thermalvis -t 2 \
+  -n 51 -w 50 -s 51 -e 50 \
+  '\' \
+  -n 52 -w 50 -s 52 -e 50 \
+  --min-gap 0.5 --alpha 0.4
 ```
-
-Сборка:
-- Один файл (one‑file):
-  ```bash
-  poetry run pyinstaller -F -n thermalvis --console -p src \
-    --collect-all matplotlib --collect-all scipy \
-    src/thermalvis_of_indoor_environments/cli.py
-  ```
-- Папка (one‑dir, надёжнее):
-  ```bash
-  poetry run pyinstaller -D -n thermalvis --console -p src \
-    --collect-all matplotlib --collect-all scipy \
-    src/thermalvis_of_indoor_environments/cli.py
-  ```
-
-Запуск:
-- Linux/macOS: ./dist/thermalvis (или ./dist/thermalvis/thermalvis)
-- Windows: .\dist\thermalvis.exe (или .\dist\thermalvis\thermalvis.exe)
-
-Замечания:
-- Собирать нужно на той же ОС/архитектуре, где запускать.
-- С GUI‑бэкендом Matplotlib размер бинарника будет большим (это нормально).
-- На сервере/WSL используйте headless (Agg) и --no-show, либо убедитесь, что установлен Tk/Qt.
-- При повторной сборке на всякий случай можно добавить флаг `--clean`.
 
 ---
 
-## Разработка
+Temp 2
 
-- Линт и формат (если используете Ruff):
-  ```bash
-  poetry run ruff check .
-  poetry run ruff check . --fix
-  poetry run ruff format
-  ```
-- Тесты (если используете pytest):
-  ```bash
-  poetry run pytest -q
-  ```
-
-Полезные команды Poetry:
 ```bash
-poetry check
-poetry lock
-poetry install
-poetry show --tree
-poetry env use 3.12
+poetry run thermalvis -t 2 \
+  -n 25.2 -w 24.2 -s 25.4 -e 24.5 \
+  '\' \
+  -n 24.8 -w 24.0 -s 25.0 -e 25.9 \
+  --min-gap 0.05 --alpha 0.4
+```
+
+Phi 2
+```bash
+poetry run thermalvis -t 2 \
+  -n 54 -w 52 -s 53 -e 47 \
+  '\' \
+  -n 53 -w 52 -s 53 -e 52 \
+  --min-gap 0.5 --alpha 0.4
 ```
 
 ---
 
-## Частые проблемы
+Temp 3
 
-- “Command not found: thermalvis”:
-  - Установите пакет или используйте poetry run thermalvis.
-  - Проверьте PATH (venv/bin или ~/.local/bin).
-- “pyproject.toml changed significantly…”:
-  - Выполните: poetry lock, затем poetry install.
-- Ошибки SciPy/Matplotlib при установке:
-  - Используйте Python 3.11–3.12.
-- “No display name and no $DISPLAY”:
-  - Запускайте в headless-режиме: установить MPLBACKEND=Agg и флаг --no-show.
+```bash
+poetry run thermalvis -t 2 \
+  -n 23.3 -w 23.3 -s 24.0 -e 22.5 \
+  '\' \
+  -n 24.0 -w 22.8 -s 24.3 -e 23.1 \
+  --min-gap 0.05 --alpha 0.4
+```
+
+Phi 3
+
+```bash
+poetry run thermalvis -t 2 \
+  -n 39 -w 39 -s 35 -e 41 \
+  '\' \
+  -n 39 -w 40 -s 35 -e 39 \
+  --min-gap 0.5 --alpha 0.4
+```
 
 ---
 
-## Лицензия
+Temp 4
 
-MIT
+```bash
+poetry run thermalvis -t 2 \
+  -n 22.4 -w 22.0 -s 22.4 -e 22.2 \
+  '\' \
+  -n 22.8 -w 22.1 -s 22.8 -e 22.6 \
+  --min-gap 0.05 --alpha 0.4
+```
+
+Phi 4
+
+```bash
+poetry run thermalvis -t 2 \
+  -n 42 -w 41 -s 41 -e 41 \
+  '\' \
+  -n 45 -w 41 -s 43 -e 40 \
+  --min-gap 0.5 --alpha 0.4
+```

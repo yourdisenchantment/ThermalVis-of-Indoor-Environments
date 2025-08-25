@@ -47,6 +47,7 @@ def run_visualization(
     show: bool = True,
     min_gap: float = 0.1,  # минимальный зазор между поверхностями
     alpha: float = 0.4,  # прозрачность поверхностей
+    tick_step: float = 0.1,  # шаг делений по оси Z и colorbar (например, 0.1 или 0.05)
 ) -> tuple[plt.Figure, plt.Axes]:
     # Сетка и область
     grid_x, grid_y = np.mgrid[-1:26:25j, 0:25:25j]
@@ -70,7 +71,7 @@ def run_visualization(
         Z2 = _interpolate(pts2, grid_x, grid_y)
         Z2[~mask] = np.nan
 
-    # Общий диапазон по введённым значениям (как в исходном коде — по z_points)
+    # Общий диапазон по введённым значениям
     inputs = [north, west, south, east]
     if has_second:
         inputs += [float(north2), float(west2), float(south2), float(east2)]
@@ -79,37 +80,30 @@ def run_visualization(
     if vmax_in == vmin_in:
         vmax_in = vmin_in + 1e-6
 
-    # «Антислипание»: гарантируем min_gap по Z между поверхностями
+    # Антислипание
     if has_second and Z2 is not None:
         diff = Z2 - Z1
         finite = np.isfinite(diff)
         if np.any(finite):
             min_abs_diff = float(np.nanmin(np.abs(diff[finite])))
             if min_abs_diff < min_gap:
-                sign = float(np.sign(np.nanmedian(diff[finite])))
-                if sign == 0.0:
-                    sign = 1.0
+                sign = float(np.sign(np.nanmedian(diff[finite]))) or 1.0
                 delta = (min_gap - min_abs_diff) / 2.0
                 Z1 = Z1 - delta * sign
                 Z2 = Z2 + delta * sign
 
-    # Границы по Z для стен: [floor(min); ceil(max на 0.1) + 0.1]
+    # Границы по Z для стен: [floor(min); ceil(max к ближайшей десятой) + 0.1]
     zmin_surface = np.nanmin(Z1) if Z2 is None else float(min(np.nanmin(Z1), np.nanmin(Z2)))
     zmax_surface = np.nanmax(Z1) if Z2 is None else float(max(np.nanmax(Z1), np.nanmax(Z2)))
-
-    # старт от целого вниз (как в примере 20.1 -> 20.0)
     z_floor = float(math.floor(min(vmin_in, zmin_surface)))
-    # верх до ближайшей десятой + 0.1 (20.5 -> 20.6)
     z_ceil = float(math.ceil(max(vmax_in, zmax_surface) * 10) / 10 + 0.1)
-    # округлим до сотых, чтобы избежать артефактов 20.5999999
     z_floor = round(z_floor, 2)
     z_ceil = round(z_ceil, 2)
 
-    # Палитра как в исходнике (синий -> циан -> жёлтый -> красный), общая нормализация
+    # Палитра (как в исходнике)
     colors = [(0, 0, 1), (0, 1, 1), (1, 1, 0), (1, 0, 0)]
     cmap = LinearSegmentedColormap.from_list("custom_cmap", colors)
 
-    # Цвета для поверхностей по общему диапазону входов
     def _rgba(Z: np.ndarray) -> np.ndarray:
         norm_grid = (Z - vmin_in) / (vmax_in - vmin_in)
         rgba = cmap(norm_grid)
@@ -119,7 +113,7 @@ def run_visualization(
     rgba1 = _rgba(Z1)
     rgba2 = _rgba(Z2) if (has_second and Z2 is not None) else None
 
-    # Фигура и 3D‑оси (без «сплющивания»)
+    # Фигура и 3D‑оси
     fig = plt.figure(figsize=(16, 9))
     ax = fig.add_subplot(111, projection="3d")
     ax.view_init(elev=40, azim=-140)
@@ -131,48 +125,55 @@ def run_visualization(
     if has_second and Z2 is not None and rgba2 is not None:
         ax.plot_surface(grid_x, grid_y, Z2, facecolors=rgba2, edgecolor="none", shade=False)
 
-    # Точки стен (набор 1)
-    wall_pts1 = [[0.0, 12.5, north], [12.5, 0.0, west], [25.0, 12.5, south], [12.5, 25.0, east]]
+    # Подписи к точкам в требуемом порядке: т.1 запад, т.2 север, т.3 юг, т.4 восток
+    pts1_ordered = [
+        ("т.1 (запад)", [12.5, 0.0, west]),
+        ("т.2 (север)", [0.0, 12.5, north]),
+        ("т.3 (юг)", [25.0, 12.5, south]),
+        ("т.4 (восток)", [12.5, 25.0, east]),
+    ]
     ax.scatter(
-        [p[0] for p in wall_pts1],
-        [p[1] for p in wall_pts1],
-        [p[2] for p in wall_pts1],
+        [p[1][0] for p in pts1_ordered],
+        [p[1][1] for p in pts1_ordered],
+        [p[1][2] for p in pts1_ordered],
         c="black",
         marker="o",
         label="Набор 1",
     )
-    for p, label in zip(wall_pts1, ["Север", "Запад", "Юг", "Восток"], strict=False):
-        ax.text(p[0], p[1], p[2], f"{label} ({p[2]:.1f})", fontsize=11, va="bottom", color="black")
+    for label, p in pts1_ordered:
+        ax.text(p[0], p[1], p[2], label, fontsize=11, va="bottom", color="black")
 
-    # Точки стен (набор 2)
     if has_second:
-        wall_pts2 = [
-            [0.0, 12.5, north2],
-            [12.5, 0.0, west2],
-            [25.0, 12.5, south2],
-            [12.5, 25.0, east2],
+        pts2_ordered = [
+            ("т.1 (запад)", [12.5, 0.0, west2]),
+            ("т.2 (север)", [0.0, 12.5, north2]),
+            ("т.3 (юг)", [25.0, 12.5, south2]),
+            ("т.4 (восток)", [12.5, 25.0, east2]),
         ]
         ax.scatter(
-            [p[0] for p in wall_pts2],
-            [p[1] for p in wall_pts2],
-            [p[2] for p in wall_pts2],
+            [p[1][0] for p in pts2_ordered],
+            [p[1][1] for p in pts2_ordered],
+            [p[1][2] for p in pts2_ordered],
             c="dimgray",
             marker="^",
             label="Набор 2",
         )
+        for label, p in pts2_ordered:
+            ax.text(p[0], p[1], p[2], label, fontsize=11, va="bottom", color="dimgray")
 
-    # Цветовая шкала по общему диапазону входов с шагом 0.05
+    # Цветовая шкала по общему диапазону входов с настраиваемым шагом
     sm = plt.cm.ScalarMappable(cmap=cmap)
     sm.set_clim(vmin_in, vmax_in)
     cbar = fig.colorbar(sm, ax=ax, shrink=0.6, aspect=10, pad=0.05)
-    # тики по 0.05
-    tick_start = math.floor(vmin_in / 0.05) * 0.05
-    tick_end = math.ceil(vmax_in / 0.05) * 0.05
-    cbar.set_ticks(np.round(np.arange(tick_start, tick_end + 0.0001, 0.05), 2))
+    step = tick_step if (tick_step and tick_step > 0) else 0.1
+    tick_start = math.floor(vmin_in / step) * step
+    tick_end = math.ceil(vmax_in / step) * step
+    ticks = np.round(np.arange(tick_start, tick_end + step / 2.0, step), 3)
+    cbar.set_ticks(ticks)
     cbar.set_label(f"Температура (общий диапазон: {vmin_in:.2f} … {vmax_in:.2f})")
 
-    # Стены помещения (вертикальные поверхности) + нижние контуры
-    wall_alpha = 0.1
+    # Стены помещения
+    wall_alpha = 0.3
     wall_color = "gray"
     left_points = np.array([(5, -5), (5, 5), (0, 5), (0, 25), (5, 25)])
     right_points = np.array([(20, 25), (25, 25), (25, 5), (20, 5), (20, -5)])
@@ -204,10 +205,12 @@ def run_visualization(
             )
     ax.plot(arc_x, arc_y, np.full_like(arc_x, z_floor), color="black", linewidth=1.0)
 
-    # Оси и деления по Z: шаг 0.05
+    # Ось Z: настраиваемые деления
     ax.set_zlim(z_floor, z_ceil)
-    ax.zaxis.set_major_locator(mticker.MultipleLocator(0.1))
-    ax.zaxis.set_minor_locator(mticker.MultipleLocator(0.05))
+    ax.zaxis.set_major_locator(mticker.MultipleLocator(step))
+    minor = step / 2.0 if step > 0 else 0.05
+    if minor > 0:
+        ax.zaxis.set_minor_locator(mticker.MultipleLocator(minor))
     ax.grid(True, which="both", axis="z", linestyle=":", linewidth=0.5, alpha=0.6)
 
     if has_second:

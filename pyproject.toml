@@ -1,6 +1,6 @@
 [project]
 name = "thermalvis-of-indoor-environments"
-version = "0.2.0"
+version = "0.3.0"
 description = "Visualization of indoor thermal environment"
 authors = [{ name = "yourdisenchantment", email = "p.idisenchantment@gmail.com" }]
 readme = "README.md"
@@ -26,6 +26,7 @@ ruff = "^0.12.10"
 scipy-stubs = "^1.16.1.1"
 pyinstaller = { version = "^6.15", python = ">=3.8,<3.15" }
 poetry-core = "^2.0.0"
+pytest = "^8.4.1"
 
 [build-system]
 requires = ["poetry-core>=2.0.0"]
