@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import math
 
+import matplotlib.patheffects as pe
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 import numpy as np
-from matplotlib.colors import LinearSegmentedColormap
+from matplotlib.colors import BoundaryNorm, LinearSegmentedColormap
 from matplotlib.path import Path
 from scipy.interpolate import griddata
+from scipy.ndimage import binary_erosion
 
 
 def _make_points(n: float, w: float, s: float, e: float) -> np.ndarray:
@@ -45,18 +47,20 @@ def run_visualization(
     south2: float | None = None,
     east2: float | None = None,
     show: bool = True,
-    min_gap: float = 0.1,  # минимальный зазор между поверхностями
+    min_gap: float = 0.1,  # вертикальный зазор между поверхностями
     alpha: float = 0.4,  # прозрачность поверхностей
-    tick_step: float = 0.1,  # шаг делений по оси Z и colorbar (например, 0.1 или 0.05)
+    tick_step: float = 0.1,  # ШАГ делений по оси Z И цветовой шкале (0.1, 0.05 и т.п.)
 ) -> tuple[plt.Figure, plt.Axes]:
-    # Сетка и область
-    grid_x, grid_y = np.mgrid[-1:26:25j, 0:25:25j]
+    # Сетка и область (узлы совпадают с целыми координатами 0..25)
+    grid_x, grid_y = np.meshgrid(np.linspace(0, 25, 51), np.linspace(0, 25, 51), indexing="ij")
     clip_contour = np.array(
         [(5, -5), (5, 5), (0, 5), (0, 25), (5, 25), (20, 25), (25, 25), (25, 5), (20, 5), (20, -5)]
     )
     clip_path = Path(clip_contour)
     grid_points = np.vstack([grid_x.ravel(), grid_y.ravel()]).T
-    mask = clip_path.contains_points(grid_points).reshape(grid_x.shape)
+    mask = clip_path.contains_points(grid_points, radius=-0.49).reshape(grid_x.shape)
+    core = binary_erosion(mask, structure=np.ones((3, 3), dtype=bool), iterations=1)
+    edge_ring = mask & ~core  # одно-узловое кольцо по периметру
 
     # Набор #1
     pts1 = _make_points(north, west, south, east)
@@ -71,7 +75,7 @@ def run_visualization(
         Z2 = _interpolate(pts2, grid_x, grid_y)
         Z2[~mask] = np.nan
 
-    # Общий диапазон по введённым значениям
+    # Общий диапазон по входам (для подписи/информации)
     inputs = [north, west, south, east]
     if has_second:
         inputs += [float(north2), float(west2), float(south2), float(east2)]
@@ -92,31 +96,52 @@ def run_visualization(
                 Z1 = Z1 - delta * sign
                 Z2 = Z2 + delta * sign
 
-    # Границы по Z для стен: [floor(min); ceil(max к ближайшей десятой) + 0.1]
+    # Границы Z кратно шагу tick_step (и для оси, и для цветовой шкалы)
     zmin_surface = np.nanmin(Z1) if Z2 is None else float(min(np.nanmin(Z1), np.nanmin(Z2)))
     zmax_surface = np.nanmax(Z1) if Z2 is None else float(max(np.nanmax(Z1), np.nanmax(Z2)))
-    z_floor = float(math.floor(min(vmin_in, zmin_surface)))
-    z_ceil = float(math.ceil(max(vmax_in, zmax_surface) * 10) / 10 + 0.1)
-    z_floor = round(z_floor, 2)
-    z_ceil = round(z_ceil, 2)
+    z_min_raw = float(min(vmin_in, zmin_surface))
+    z_max_raw = float(max(vmax_in, zmax_surface))
+    step = tick_step if (tick_step and tick_step > 0) else 0.1
 
-    # Палитра (как в исходнике)
+    z_floor = math.floor(z_min_raw / step) * step
+    z_ceil = math.ceil(z_max_raw / step) * step
+    if z_ceil <= z_floor:
+        z_ceil = z_floor + step
+    # Чуть округляем, чтобы не было 20.599999:
+    z_floor = float(np.round(z_floor, 6))
+    z_ceil = float(np.round(z_ceil, 6))
+
+    # Палитра (как в исходнике) + прозрачность для NaN
     colors = [(0, 0, 1), (0, 1, 1), (1, 1, 0), (1, 0, 0)]
     cmap = LinearSegmentedColormap.from_list("custom_cmap", colors)
+    cmap.set_bad((0, 0, 0, 0))  # NaN - прозрачные
+
+    # Дискретные уровни цвета c заданным шагом + нормализация
+    levels = np.round(np.arange(z_floor, z_ceil + step / 2.0, step), 6)
+    norm = BoundaryNorm(levels, ncolors=cmap.N, clip=True)
 
     def _rgba(Z: np.ndarray) -> np.ndarray:
-        norm_grid = (Z - vmin_in) / (vmax_in - vmin_in)
-        rgba = cmap(norm_grid)
-        rgba[..., 3] = alpha
+        rgba = cmap(norm(Z))
+        # сохраняем прозрачность NaN, альфа - только по валидным значениям
+        finite_mask = np.isfinite(Z)
+        rgba[finite_mask, 3] = alpha
         return rgba
 
     rgba1 = _rgba(Z1)
     rgba2 = _rgba(Z2) if (has_second and Z2 is not None) else None
 
-    # Фигура и 3D‑оси
+    if "edge_ring" in locals():
+        if rgba1 is not None:
+            er1 = edge_ring & np.isfinite(Z1)
+            rgba1[er1, 3] = np.clip(alpha * 0.25, 0.0, 1.0)  # 25% от общей альфы
+        if rgba2 is not None and Z2 is not None:
+            er2 = edge_ring & np.isfinite(Z2)
+            rgba2[er2, 3] = np.clip(alpha * 0.25, 0.0, 1.0)
+
+    # Фигура
     fig = plt.figure(figsize=(16, 9))
     ax = fig.add_subplot(111, projection="3d")
-    ax.view_init(elev=40, azim=-140)
+    ax.view_init(elev=40, azim=40)
     ax.set_facecolor("white")
     fig.patch.set_facecolor("white")
 
@@ -125,12 +150,54 @@ def run_visualization(
     if has_second and Z2 is not None and rgba2 is not None:
         ax.plot_surface(grid_x, grid_y, Z2, facecolors=rgba2, edgecolor="none", shade=False)
 
-    # Подписи к точкам в требуемом порядке: т.1 запад, т.2 север, т.3 юг, т.4 восток
+    # Формат чисел в подписях точек под шаг делений
+    val_dec = 2 if step < 0.1 else 1
+    val_fmt = f"{{:.{val_dec}f}}"
+
+    # Небольшие компактные плашки
+    box1 = dict(
+        boxstyle="round,pad=0.15,rounding_size=0.10",
+        fc="white",
+        lw=0.8,
+        alpha=0.75,
+    )
+    box2 = dict(
+        boxstyle="round,pad=0.15,rounding_size=0.10",
+        fc="#f3f3f3",
+        lw=0.8,
+        alpha=0.75,
+    )
+
+    # Настройка расположения плашек
+    # варианты: "below", "above", "left", "right"
+    label_mode1 = "below"
+    label_mode2 = "above" if has_second else "below"
+    xy_off = 0.8  # смещение по X/Y (в «метрах» плана 0..25)
+    z_off = max(0.6 * step, 0.05)  # смещение по Z связано с шагом делений
+
+    def _offset_point(p, mode: str, xy_off: float, z_off: float):
+        x, y, z = p
+        ha, va = "center", "center"
+        if mode == "below":
+            z -= z_off
+            ha, va = "center", "top"
+        elif mode == "above":
+            z += z_off
+            ha, va = "center", "bottom"
+        elif mode == "right":
+            x += xy_off
+            ha, va = "left", "center"
+        elif mode == "left":
+            x -= xy_off
+            ha, va = "right", "center"
+        return (x, y, z), ha, va
+
+    # Подписи к точкам в порядке: т.1 запад, т.2 север, т.3 юг, т.4 восток
     pts1_ordered = [
-        ("т.1 (запад)", [12.5, 0.0, west]),
-        ("т.2 (север)", [0.0, 12.5, north]),
-        ("т.3 (юг)", [25.0, 12.5, south]),
-        ("т.4 (восток)", [12.5, 25.0, east]),
+        (f"т.1 ({val_fmt.format(west)}) Запад", [12.5, 0.0, west]),
+        (f"т.2 ({val_fmt.format(north)}) Север", [0.0, 12.5, north]),
+        (f"т.3 ({val_fmt.format(south)}) Юг", [25.0, 12.5, south]),
+        (f"т.4 ({val_fmt.format(east)}) Восток", [12.5, 25.0, east]),
     ]
     ax.scatter(
         [p[1][0] for p in pts1_ordered],
@@ -141,14 +208,28 @@ def run_visualization(
         label="Набор 1",
     )
     for label, p in pts1_ordered:
-        ax.text(p[0], p[1], p[2], label, fontsize=11, va="bottom", color="black")
+        (tx, ty, tz), ha, va = _offset_point(p, label_mode1, xy_off, z_off)
+        txt = ax.text(
+            tx,
+            ty,
+            tz,
+            label,
+            fontsize=9,
+            color="#111111",
+            ha=ha,
+            va=va,
+            bbox=box1,
+            zorder=10,
+            clip_on=False,
+        )
+        txt.set_path_effects([pe.withStroke(linewidth=2.0, foreground="white", alpha=0.8)])
 
     if has_second:
         pts2_ordered = [
-            ("т.1 (запад)", [12.5, 0.0, west2]),
-            ("т.2 (север)", [0.0, 12.5, north2]),
-            ("т.3 (юг)", [25.0, 12.5, south2]),
-            ("т.4 (восток)", [12.5, 25.0, east2]),
+            (f"т.1 ({val_fmt.format(west2)}) Запад", [12.5, 0.0, west2]),
+            (f"т.2 ({val_fmt.format(north2)}) Север", [0.0, 12.5, north2]),
+            (f"т.3 ({val_fmt.format(south2)}) Юг", [25.0, 12.5, south2]),
+            (f"т.4 ({val_fmt.format(east2)}) Восток", [12.5, 25.0, east2]),
         ]
         ax.scatter(
             [p[1][0] for p in pts2_ordered],
@@ -159,21 +240,37 @@ def run_visualization(
             label="Набор 2",
         )
         for label, p in pts2_ordered:
-            ax.text(p[0], p[1], p[2], label, fontsize=11, va="bottom", color="dimgray")
+            (tx, ty, tz), ha, va = _offset_point(p, label_mode2, xy_off, z_off)
+            txt = ax.text(
+                tx,
+                ty,
+                tz,
+                label,
+                fontsize=9,
+                color="#222222",
+                ha=ha,
+                va=va,
+                bbox=box2,
+                zorder=10,
+                clip_on=False,
+            )
+            txt.set_path_effects([pe.withStroke(linewidth=2.0, foreground="white", alpha=0.8)])
 
-    # Цветовая шкала по общему диапазону входов с настраиваемым шагом
-    sm = plt.cm.ScalarMappable(cmap=cmap)
-    sm.set_clim(vmin_in, vmax_in)
-    cbar = fig.colorbar(sm, ax=ax, shrink=0.6, aspect=10, pad=0.05)
-    step = tick_step if (tick_step and tick_step > 0) else 0.1
-    tick_start = math.floor(vmin_in / step) * step
-    tick_end = math.ceil(vmax_in / step) * step
-    ticks = np.round(np.arange(tick_start, tick_end + step / 2.0, step), 3)
-    cbar.set_ticks(ticks)
-    cbar.set_label(f"Температура (общий диапазон: {vmin_in:.2f} … {vmax_in:.2f})")
+    # Цветовая шкала: ровно по уровням levels
+    sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+    sm.set_clim(z_floor, z_ceil)
+    cbar = fig.colorbar(sm, ax=ax, shrink=0.6, aspect=10, pad=0.05, boundaries=levels, ticks=levels)
+    # Красота формата тиков
+    if step < 0.1:
+        fmt = mticker.FormatStrFormatter("%.2f")
+    else:
+        fmt = mticker.FormatStrFormatter("%.1f")
+    cbar.formatter = fmt
+    cbar.update_ticks()
+    cbar.set_label(f"Диапазон: {z_floor:.2f} … {z_ceil:.2f} (шаг {step:g})")
 
     # Стены помещения
-    wall_alpha = 0.3
+    wall_alpha = 0.1  # оставляем 0.1, как просили
     wall_color = "gray"
     left_points = np.array([(5, -5), (5, 5), (0, 5), (0, 25), (5, 25)])
     right_points = np.array([(20, 25), (25, 25), (25, 5), (20, 5), (20, -5)])
@@ -205,13 +302,12 @@ def run_visualization(
             )
     ax.plot(arc_x, arc_y, np.full_like(arc_x, z_floor), color="black", linewidth=1.0)
 
-    # Ось Z: настраиваемые деления
+    # Ось Z: деления строго по step, без «мелких»
     ax.set_zlim(z_floor, z_ceil)
     ax.zaxis.set_major_locator(mticker.MultipleLocator(step))
-    minor = step / 2.0 if step > 0 else 0.05
-    if minor > 0:
-        ax.zaxis.set_minor_locator(mticker.MultipleLocator(minor))
-    ax.grid(True, which="both", axis="z", linestyle=":", linewidth=0.5, alpha=0.6)
+    ax.zaxis.set_minor_locator(mticker.NullLocator())
+    ax.zaxis.set_major_formatter(fmt)
+    ax.grid(True, which="major", axis="z", linestyle=":", linewidth=0.5, alpha=0.6)
 
     if has_second:
         ax.legend(loc="upper left")
