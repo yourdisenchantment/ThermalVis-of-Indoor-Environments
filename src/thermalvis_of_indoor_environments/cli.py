@@ -23,7 +23,9 @@ def _readline_any(prompt: str) -> str:
 
 def _prompt_float(prompt: str, default: float | None = None) -> float:
     while True:
-        raw = _readline_any(f"{prompt}" + (f" [{default}]" if default is not None else ""))
+        raw = _readline_any(
+            f"{prompt}" + (f" [{default}]" if default is not None else "")
+        )
         if raw == "" and default is not None:
             return float(default)
         try:
@@ -32,7 +34,9 @@ def _prompt_float(prompt: str, default: float | None = None) -> float:
             print("Введите число (можно с точкой или запятой).")
 
 
-def _prompt_int(prompt: str, default: int = 1, choices: tuple[int, ...] = (1, 2)) -> int:
+def _prompt_int(
+    prompt: str, default: int = 1, choices: tuple[int, ...] = (1, 2)
+) -> int:
     while True:
         raw = _readline_any(f"{prompt} [{default}]")
         if raw == "":
@@ -86,7 +90,11 @@ def main() -> None:
         help="Минимальный вертикальный зазор между поверхностями (например, 0.05 или 0.1).",
     )
     parser.add_argument(
-        "--alpha", "-alpha", type=float, default=0.4, help="Прозрачность поверхностей (0..1)."
+        "--alpha",
+        "-alpha",
+        type=float,
+        default=0.4,
+        help="Прозрачность поверхностей (0..1).",
     )
     parser.add_argument(
         "--tick-step",
@@ -95,9 +103,19 @@ def main() -> None:
         help="Шаг делений по оси Z и на цветовой шкале (например, 0.1 или 0.05).",
     )
     parser.add_argument(
-        "--no-show", action="store_true", help="Не вызывать plt.show() (полезно в CI/сервере)."
+        "--no-show",
+        action="store_true",
+        help="Не вызывать plt.show() (полезно в CI/сервере).",
     )
-    parser.add_argument("--save", type=str, help="Путь для сохранения изображения (PNG/PDF/SVG).")
+    parser.add_argument(
+        "--save", type=str, help="Путь для сохранения изображения (PNG/PDF/SVG)."
+    )
+    parser.add_argument(
+        "--grid-res",
+        type=int,
+        default=27,
+        help="Число узлов по каждой оси (включая оверскан). Минимум 3. Например, 27 (шаг ~1), 51 (шаг ~0.5), 101 (шаг ~0.25).",
+    )
 
     # Парсим только базовые и оставляем "наборные" флаги для отдельного разбора
     args, rest = parser.parse_known_args()
@@ -107,7 +125,9 @@ def main() -> None:
         t = (
             args.type
             if args.type is not None
-            else _prompt_int("Сколько графиков строить (1/2)", default=1, choices=(1, 2))
+            else _prompt_int(
+                "Сколько графиков строить (1/2)", default=1, choices=(1, 2)
+            )
         )
 
         # Набор 1 - порядок точек: т.1 запад, т.2 север, т.3 юг, т.4 восток
@@ -125,7 +145,8 @@ def main() -> None:
 
         # Опционально: шаг делений и прозрачность (Enter - оставить по умолчанию)
         tick_step = _prompt_float(
-            "Расстояние между делениями (например, 0.1 или 0.05)", default=args.tick_step
+            "Расстояние между делениями (например, 0.1 или 0.05)",
+            default=args.tick_step,
         )
         alpha = _prompt_float("Прозрачность поверхностей (0..1)", default=args.alpha)
 
@@ -142,6 +163,9 @@ def main() -> None:
             min_gap=args.min_gap,
             alpha=alpha,
             tick_step=tick_step,
+            grid_res=max(
+                3, int(args.grid_res)
+            ),  # защита от слишком маленького значения
         )
         if args.save:
             fig.savefig(args.save, dpi=150, bbox_inches="tight")
@@ -190,6 +214,7 @@ def main() -> None:
         min_gap=args.min_gap,
         alpha=args.alpha,
         tick_step=args.tick_step,
+        grid_res=max(3, int(args.grid_res)),
     )
     if args.save:
         fig.savefig(args.save, dpi=150, bbox_inches="tight")
