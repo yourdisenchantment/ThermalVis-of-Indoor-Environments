@@ -122,6 +122,8 @@ poetry run thermalvis -t 2 \
   --min-gap 0.05 --alpha 0.4
 ```
 
+![T_1.jpeg](plots/T_1.jpeg)
+
 Phi 1
 
 ```bash
@@ -131,6 +133,8 @@ poetry run thermalvis -t 2 \
   -n 52 -w 50 -s 52 -e 50 \
   --min-gap 0.5 --alpha 0.4
 ```
+
+![Phi_1.jpeg](plots/Phi_1.jpeg)
 
 ---
 
@@ -144,6 +148,8 @@ poetry run thermalvis -t 2 \
   --min-gap 0.05 --alpha 0.4
 ```
 
+![T_2.jpeg](plots/T_2.jpeg)
+
 Phi 2
 ```bash
 poetry run thermalvis -t 2 \
@@ -152,6 +158,8 @@ poetry run thermalvis -t 2 \
   -n 53 -w 52 -s 53 -e 52 \
   --min-gap 0.5 --alpha 0.4
 ```
+
+![Phi_2.jpeg](plots/Phi_2.jpeg)
 
 ---
 
@@ -165,6 +173,8 @@ poetry run thermalvis -t 2 \
   --min-gap 0.05 --alpha 0.4
 ```
 
+![T_3.jpeg](plots/T_3.jpeg)
+
 Phi 3
 
 ```bash
@@ -174,6 +184,8 @@ poetry run thermalvis -t 2 \
   -n 39 -w 40 -s 35 -e 39 \
   --min-gap 0.5 --alpha 0.4
 ```
+
+![Phi_3.jpeg](plots/Phi_3.jpeg)
 
 ---
 
@@ -187,6 +199,8 @@ poetry run thermalvis -t 2 \
   --min-gap 0.05 --alpha 0.4
 ```
 
+![T_4.jpeg](plots/T_4.jpeg)
+
 Phi 4
 
 ```bash
@@ -196,3 +210,5 @@ poetry run thermalvis -t 2 \
   -n 45 -w 41 -s 43 -e 40 \
   --min-gap 0.5 --alpha 0.4
 ```
+
+![Phi_4.jpeg](plots/Phi_4.jpeg)

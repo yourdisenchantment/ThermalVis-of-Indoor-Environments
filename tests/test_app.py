@@ -159,7 +159,9 @@ TWO_SET_CASES = [
 ]
 
 
-@pytest.mark.parametrize("label, case", TWO_SET_CASES, ids=[c[0] for c in TWO_SET_CASES])
+@pytest.mark.parametrize(
+    "label, case", TWO_SET_CASES, ids=[c[0] for c in TWO_SET_CASES]
+)
 def test_examples_two_sets(label, case):
     fig, ax = run_visualization(
         case["n1"],
@@ -191,7 +193,9 @@ SINGLE_SET_CASES = [
 ]
 
 
-@pytest.mark.parametrize("label, case", SINGLE_SET_CASES, ids=[c[0] for c in SINGLE_SET_CASES])
+@pytest.mark.parametrize(
+    "label, case", SINGLE_SET_CASES, ids=[c[0] for c in SINGLE_SET_CASES]
+)
 def test_examples_single_set(label, case):
     fig, ax = run_visualization(case["n"], case["w"], case["s"], case["e"], show=False)
     assert fig is not None and ax is not None
